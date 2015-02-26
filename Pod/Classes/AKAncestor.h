@@ -11,7 +11,7 @@
 /**
  *  AKAncestor a base class designed for subclasses to use as models or configuration objects. Subclasses can then inheirt property values from ancestor instances to limit the amount of configuration needed. Whenever a valid property on a descendant is nil, it will consult it's ancestor to try and find a value. In this way, you can view creating descendants as creating copies which remember their parent instance. This behavior can also be disabled per-property on individual instances. This ancestor is strongly retained by its descendants, so some caution is advised to avoid creating retain cycles.
  *
- *  AKAncestor also provides special attention to KVC if your descendants and ancestors need it. If a descendant is inheriting a property value from an ancestor, and that ancestor changes it's property value, the descendant also sends out a key-value notification so any observers on the descendant are properly informed. This behavior can also be disabled per-instance if KVC is not necessary.
+ *  AKAncestor also provides special attention to KVC if your descendants and ancestors need it. If a descendant is inheriting a property value from an ancestor, and that ancestor changes it's property value, the descendant also sends out a key-value notification so any observers on the descendant are properly informed. This behavior can also be disabled per-instance if KVC is not necessary. The inheritsKeyValueNotifications property indicates whether the receiver was configured to vend these notifications or not.
  *
  *  Subclasses should be aware that only object properties can be inherited. This happens automatically when a subclass is created, and the properties which can be inherited form the +propertiesPassedToDescendants set. Also, the property getters are swizzled by AKAncestor when the class initializes, so while a subclass is free to provide a custom getter implementation, swizzling the methods again may result in odd behavior. This also means that properties added at runtime are not supported.
  */
@@ -20,7 +20,7 @@
 #pragma mark - Creating descendants
 
 /**
- *  Creates a descendant of the given ancestor. Equivalent to calling -initWithAncestor:inheritKeyValueNotifications: passing the given ancestor and YES.
+ *  Creates a descendant of the given ancestor. Equivalent to calling -initWithAncestor:inheritKeyValueNotifications: passing the given ancestor and the ancestor's inheritsKeyValueNotifications value.
  *
  *  @param ancestor The ancestor to inherit from. This may be nil.
  *
@@ -32,14 +32,14 @@
  *  Designated initializer. Connects an instance to a given ancestor, and optionally adds key-value observations on the ancestor to vend notifications about property changes. If performance is important or key-value compliance is not an issue, then it may be more efficient to pass NO for shouldInheritKeyValueNotifications, since it will remove the additional overhead of adding and processing those notifications. All convenience initializers of this class pass YES for shouldInheritKeyValueNotifications.
  *
  *  @param ancestor                           An optional ancestor to inherit property values from. This may be nil.
- *  @param shouldInheritKeyValueNotifications YES to add key-value observations on the ancestor and vend notifications when inherited property values change, or NO to not add any key-value observatios on the ancestor.
+ *  @param shouldInheritKeyValueNotifications YES to add key-value observations on the ancestor and vend notifications when inherited property values change, or NO to not add any key-value observations on the ancestor.
  *
  *  @return An initialized instance of the receiver which will inherit property values from the ancestor if provided.
  */
 - (instancetype)initWithAncestor:(AKAncestor *)ancestor inheritKeyValueNotifications:(BOOL)shouldInheritKeyValueNotifications NS_DESIGNATED_INITIALIZER;
 
 /**
- *  Creates a descendant of the receiver with the same inheritsKeyValueNotifications as the receiver.
+ *  Creates a descendant of the receiver with the same inheritsKeyValueNotifications value as the receiver.
  *
  *  @return A new descendant of the receiver.
  */

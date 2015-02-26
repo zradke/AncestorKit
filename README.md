@@ -5,7 +5,7 @@
 [![License](https://img.shields.io/cocoapods/l/AncestorKit.svg?style=flat)](http://cocoadocs.org/docsets/AncestorKit)
 [![Platform](https://img.shields.io/cocoapods/p/AncestorKit.svg?style=flat)](http://cocoadocs.org/docsets/AncestorKit)
 
-Inspired by the 2014 WWDC Session ['Advanced User Interfaces with Collection Views,'](http://asciiwwdc.com/2014/sessions/232) AncestorKit provides a way to easily create instance-based inheritance of property values. With it, you can easily create models or configuration objects whose property values trickle down to descendants. Trust me, it makes way more sense when you see it in practice.
+Inspired by the 2014 WWDC Session ['Advanced User Interfaces with Collection Views,'](http://asciiwwdc.com/2014/sessions/232) AncestorKit provides a way to easily create instance-based inheritance of property values. With it, you can create models or configuration objects whose property values trickle down to descendants. Trust me, it makes way more sense when you see it in practice.
 
 ## Usage
 
@@ -14,10 +14,12 @@ Inspired by the 2014 WWDC Session ['Advanced User Interfaces with Collection Vie
 For example, let's say we were building a family tree:
 
 	@interface Person : AKAncestor
-		@property (copy, nonatomic) NSString *firstName;
-		@property (copy, nonatomic) NSString *lastName;
-		
-		- (NSString *)fullName;
+	
+	@property (copy, nonatomic) NSString *firstName;
+	@property (copy, nonatomic) NSString *lastName;
+	
+	- (NSString *)fullName;
+	
 	@end
 
 ### Create ancestors and descendants
@@ -79,6 +81,83 @@ Madonna Ciccone would shed her last name and become a pop star, so we need our m
 
 Perfect!
 
+## Advanced usage
+
+### Primitive properties
+
+Let's say you were using a subclass of `AKAncestor` to set section insets of a collection view:
+
+	@interface CollectionViewSectionAttributes : AKAncestor
+	
+	// Interact with this property
+	@property (assign, nonatomic) UIEdgeInsets sectionInsets;
+	
+	@end
+	
+	@interface CollectionViewSectionAttributes (Private)
+	
+	// This property acts as storage for the primitive sectionInsets property, and is inheritable
+	@property (strong, nonatomic) NSValue *sectionInsetsValue;
+	
+	@end
+
+If you can find a way to convert your primitive types into objects, you can use private storage properties to actually store the data, making them eligible for inheritance. Of course, this means creating appropriate getters and setters yourself for the primitive property:
+
+	@implementation CollectionViewSectionAttributes
+	
+	- (UIEdgeInsets)sectionInsets
+	{
+		return (self.sectionInsetsValue) ? [self.sectionInsetsValue UIEdgeInsetsValue] : UIEdgeInsetsZero;
+	}
+	
+	- (void)setSectionInsets:(UIEdgeInsets)sectionInsets
+	{
+		if (!UIEdgeInsetsEqualToEdgeInsets(self.sectionInsets, sectionInsets))
+		{
+			self.sectionInsetsValue = [NSValue valueWithUIEdgeInsets:sectionInsets];
+		}
+	}
+	
+	- (NSSet *)keyPathsAffectingSectionInsets
+	{
+		return [NSSet setWithObject:@"sectionInsetsValue"];
+	}
+	
+	@end
+
+### Key-Value Observations
+
+Let's say we have to observe the `sectionInsets` property of our `CollectionViewSectionAttributes` objects:
+
+	CollectionViewSectionAttributes *rootAttrs = [CollectionViewSectionAttributes new];
+	rootAttrs.sectionInsets = UIEdgeInsetsMake(15.0, 15.0, 15.0, 15.0);
+	
+	...
+	
+	CollectionViewSectionAttributes *sectionAttrs = [rootAttrs descendant];
+	[sectionAttrs addObserver:self forKeyPath:@"sectionInsets" options:0 context:nil];
+	
+Although we haven't done any extra work, we get key-value notifications of inherited property values for free! So for example:
+
+	// We change the root section attributes
+	rootAttrs.sectionInsets = UIEdgeInsetsMake(10.0, 10.0, 10.0, 10.0);
+
+Even though we're changing the ancestor, `sectionAttrs` will notify observers that its `sectionInset` has been updated like we'd expect. And also like we'd expect, we won't get phantom notifications if the instance has its own property value:
+
+	// This will generate a notification
+	sectionAttrs.sectionInsets = UIEdgeInsetsMake(40.0, 0.0, 10.0, 0.0);
+	
+	// This won't generate a notification on sectionAttrs
+	rootAttrs.sectionInsets = UIEdgeInsetsMake(12.0, 12.0, 12.0, 12.0);
+
+This behavior can be disabled if you want to avoid the overhead of key-value coding using the more verbose initializer and descendant methods:
+
+	sectionAttrs = [[CollectionViewSectionAttributes alloc] initWithAncestor:rootAttrs inheritKeyValueNotifications:NO];
+	
+	sectionAttrs = [rootAttrs descendantInheritingKeyValueNotifications:NO];
+
+Note that the standard `-init` method and the `+new` method are equivalent to calling `-initWithAncestor:inheritKeyValueNotifications:` passing `YES`, while the `-descendant` and `-descendantOf:` methods will use the ancestor's `inheritsKeyValueNotifications` property instead.
+
 ## Installation
 
 AncestorKit is available through [CocoaPods](http://cocoapods.org). To install
@@ -88,9 +167,13 @@ it, simply add the following line to your Podfile:
 
 ## Details and Caveats
 
-AncestorKit uses the Objective-C runtime to inspect subclasses of `AKAncestor`, locate properties which can be inherited in instances, and swizzle those property getters. For the most part, consumers won't need to worry about this, but if you're planning on using a lot of runtime trickery yourself, be aware that the properties are swizzled in the `+initialize` method (so each subclass will swizzle its own properties). This means that any properties added dynamically through the runtime will not be inheritable.
+AncestorKit uses the Objective-C runtime to inspect subclasses of `AKAncestor`, locate properties which can be inherited in instances, and swizzle those property getters. For the most part, consumers won't need to worry about this, but if you're planning on using a lot of runtime trickery yourself, be aware that the properties are swizzled in the `+initialize` method (so each subclass will swizzle its own properties) so if you override this method in your subclass of `AKAncestor`, you **must** call `[super initialize]`. This also means that any properties added dynamically through the runtime will not be inheritable.
 
 Only object properties are eligable for inheritance. This is because object properties can be nil, which indicates that there is no value. AncestorKit relies on the concept of "no-value" to determine when it should search ancestors for a possible value. This makes it hard if not impossible to work with primitive types, since a `BOOL` property can be `NO` because it hasn't been set, or `NO` because it was intentionally set that way.
+
+## Contributing
+
+Find an issue? Feel that something needs clarification or improvement? Feel free to open an issue in Github! I'm particularly interested in seeing how to test the performance of these classes when used intensively.
 
 ## License
 

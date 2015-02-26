@@ -34,7 +34,7 @@ static void *AKAncestorKVOContext = &AKAncestorKVOContext;
 
 + (instancetype)descendantOf:(AKAncestor *)ancestor
 {
-    return [[self alloc] initWithAncestor:ancestor inheritKeyValueNotifications:YES];
+    return [[self alloc] initWithAncestor:ancestor inheritKeyValueNotifications:ancestor.inheritsKeyValueNotifications];
 }
 
 - (instancetype)initWithAncestor:(AKAncestor *)ancestor inheritKeyValueNotifications:(BOOL)shouldInheritKeyValueNotifications
