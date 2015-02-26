@@ -1,0 +1,41 @@
+PODS:
+  - AncestorKit (0.1.0)
+  - Expecta (0.3.2)
+  - FormatterKit (1.8.0):
+    - FormatterKit/AddressFormatter (= 1.8.0)
+    - FormatterKit/ArrayFormatter (= 1.8.0)
+    - FormatterKit/ColorFormatter (= 1.8.0)
+    - FormatterKit/LocationFormatter (= 1.8.0)
+    - FormatterKit/NameFormatter (= 1.8.0)
+    - FormatterKit/OrdinalNumberFormatter (= 1.8.0)
+    - FormatterKit/TimeIntervalFormatter (= 1.8.0)
+    - FormatterKit/UnitOfInformationFormatter (= 1.8.0)
+    - FormatterKit/URLRequestFormatter (= 1.8.0)
+  - FormatterKit/AddressFormatter (1.8.0)
+  - FormatterKit/ArrayFormatter (1.8.0)
+  - FormatterKit/ColorFormatter (1.8.0)
+  - FormatterKit/LocationFormatter (1.8.0)
+  - FormatterKit/NameFormatter (1.8.0)
+  - FormatterKit/OrdinalNumberFormatter (1.8.0)
+  - FormatterKit/TimeIntervalFormatter (1.8.0)
+  - FormatterKit/UnitOfInformationFormatter (1.8.0)
+  - FormatterKit/URLRequestFormatter (1.8.0)
+  - Specta (0.3.2)
+
+DEPENDENCIES:
+  - AncestorKit (from `../`)
+  - Expecta
+  - FormatterKit
+  - Specta
+
+EXTERNAL SOURCES:
+  AncestorKit:
+    :path: ../
+
+SPEC CHECKSUMS:
+  AncestorKit: 2776618478db00806ecc31f9c623320d6e36293a
+  Expecta: ee641011fe10aa1855d487b40e4976dac50ec342
+  FormatterKit: 547a808c41172136a3f3acb424ac9361d38bb32f
+  Specta: 698a58ffa5ec948327d3b92eab50ca58d7f4fbe8
+
+COCOAPODS: 0.35.0

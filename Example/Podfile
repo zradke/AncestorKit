@@ -1,0 +1,9 @@
+source 'https://github.com/CocoaPods/Specs.git'
+
+pod "AncestorKit", :path => "../"
+pod "FormatterKit"
+
+target 'Tests', :exclusive => true do
+  pod 'Specta'
+  pod 'Expecta'
+end
