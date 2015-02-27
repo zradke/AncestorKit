@@ -10,6 +10,9 @@
 #import "AKPropertyDescription.h"
 #import <objc/runtime.h>
 
+NSString *const AKAncestorNonObjectPropertyException = @"AKAncestorNonObjectPropertyException";
+NSString *const AKAncestorUnknownPropertyException = @"AKAncestorUnknownPropertyException";
+
 static void *AKAncestorKVOContext = &AKAncestorKVOContext;
 
 @interface AKAncestor ()
@@ -86,7 +89,10 @@ static void *AKAncestorKVOContext = &AKAncestorKVOContext;
 - (void)stopInheritingValuesForPropertyName:(NSString *)propertyName
 {
     NSPredicate *predicate = [NSPredicate predicateWithFormat:@"%K == %@", NSStringFromSelector(@selector(propertyName)), propertyName];
-    NSAssert([[[self class] propertiesPassedToDescendants] filteredSetUsingPredicate:predicate].count > 0, @"Property \"%@\" is not inherited by this class.", propertyName);
+    if ([[[self class] propertiesPassedToDescendants] filteredSetUsingPredicate:predicate].count == 0)
+    {
+        [NSException raise:AKAncestorUnknownPropertyException format:@"No property with the name \"%@\" is being inherited by %@.", propertyName, [self class]];
+    }
     
     [self.ak_lock lock];
     [self.ak_ignoredPropertyNames addObject:propertyName];
@@ -176,7 +182,9 @@ static void *AKAncestorKVOContext = &AKAncestorKVOContext;
     
     if (!property)
     {
-        // Somehow we're observing an unknown property! This might be worth asserting...
+        // Somehow we're observing an unknown property!
+        [NSException raise:AKAncestorUnknownPropertyException format:@"No property was found on %@ with the name \"%@\" despite it having key-value observations set.", [self class], keyPath];
+        
         [object removeObserver:self forKeyPath:keyPath context:context];
         return;
     }
@@ -354,7 +362,12 @@ static void *AKAncestorKVOContext = &AKAncestorKVOContext;
 + (void)_swizzleGetterForObjectProperty:(AKPropertyDescription *)property
 {
     NSParameterAssert(property);
-    NSAssert(property.propertyType == AKPropertyTypeObject, @"Property \"%@\" is not an object property, and cannot be inherited.", property.propertyName);
+    
+    if (!property.propertyType == AKPropertyTypeObject)
+    {
+        [NSException raise:AKAncestorNonObjectPropertyException format:@"Property \"%@\" is not an object property and cannot be inherited by %@", property.propertyName, self];
+        return;
+    }
     
     SEL originalGetter = property.propertyGetter;
     SEL swizzledGetter = [self _swizzledGetterForProperty:property];

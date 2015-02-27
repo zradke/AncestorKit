@@ -9,6 +9,17 @@
 #import <Foundation/Foundation.h>
 
 /**
+ *  Exception raised when AKAncestor attempts to swizzle a non-object property.
+ */
+FOUNDATION_EXPORT NSString *const AKAncestorNonObjectPropertyException;
+
+/**
+ *  Exception raised when an unknown property is encountered.
+ */
+FOUNDATION_EXPORT NSString *const AKAncestorUnknownPropertyException;
+
+
+/**
  *  AKAncestor a base class designed for subclasses to use as models or configuration objects. Subclasses can then inheirt property values from ancestor instances to limit the amount of configuration needed. Whenever a valid property on a descendant is nil, it will consult it's ancestor to try and find a value. In this way, you can view creating descendants as creating copies which remember their parent instance. This behavior can also be disabled per-property on individual instances. This ancestor is strongly retained by its descendants, so some caution is advised to avoid creating retain cycles.
  *
  *  AKAncestor also provides special attention to KVC if your descendants and ancestors need it. If a descendant is inheriting a property value from an ancestor, and that ancestor changes it's property value, the descendant also sends out a key-value notification so any observers on the descendant are properly informed. This behavior can also be disabled per-instance if KVC is not necessary. The inheritsKeyValueNotifications property indicates whether the receiver was configured to vend these notifications or not.
@@ -73,7 +84,7 @@
 /**
  *  Stops the receiver from inheriting property values associated with the given property name. Note that this is only applicable when the requested property is nil on the receiver. Otherwise, the overriden property value is returned as usual. Passing the same property name multiple times will have no effect on subsequent calls.
  *
- *  @param propertyName The name of the property which should stop inheriting values. This must be a member of the +propertiesPassedToDescendants set.
+ *  @param propertyName The name of the property which should stop inheriting values. This must describe the propertyName of a member of the +propertiesPassedToDescendants set, or an AKAncestorUnknownPropertyException exception will be thrown.
  */
 - (void)stopInheritingValuesForPropertyName:(NSString *)propertyName;
 
@@ -94,7 +105,9 @@
 
 /**
  *  Returns the set of AKPropertyDescription objects representing properties whose values may be inherited or passed to instances.
+ *
+ *  By default this set includes all AKPropertyTypeObject properties of the receiving class up to and excluding those of AKAncestor. Subclasses can override this method to remove properties which should never be inheritable. Subclasses should always utilize super's implementation as a starting point. It is dangerous to add new properties to this set unless you configure your subclass to handle dynamic method resolution. Attempting to add non-object properties to this method will result in an AKAncestorNonObjectPropertyException exception being raised when the class attempts to initialize.
  */
-+ (NSSet *)propertiesPassedToDescendants;
++ (NSSet *)propertiesPassedToDescendants NS_REQUIRES_SUPER;
 
 @end
