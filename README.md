@@ -34,7 +34,7 @@ Now we've defined a class, we can create an ancestor:
 
 From the ancestor, we can derive descendants:
 
-	Person *bill = [charlus descendant];
+	Person *bill = [arthur descendant];
 	bill.firstName = @"William";
 	
 	[bill fullName]; // "William Weasley"
@@ -157,6 +157,29 @@ This behavior can be disabled if you want to avoid the overhead of key-value cod
 	sectionAttrs = [rootAttrs descendantInheritingKeyValueNotifications:NO];
 
 Note that the standard `-init` method and the `+new` method are equivalent to calling `-initWithAncestor:inheritKeyValueNotifications:` passing `YES`, while the `-descendant` and `-descendantOf:` methods will use the ancestor's `inheritsKeyValueNotifications` property instead.
+
+### Permanently stopping inheritance
+
+If we return to the `Person` class we defined earlier, it's clear that `firstName` doesn't make much sense as an inheritable property, since we don't directly inherit first names the way we do last names. So let's remove it from consideration:
+
+	+ (NSSet *)propertiesPassedToDescendants
+	{
+		// Note that eventually it would be performant to cache this altered set.
+		NSPredicate *predicate = [NSPredicate predicateWithFormat:@"propertyName != %@", @"firstName"];
+		return [[super propertiesPassedToDescendants] filteredSetUsingPredicate:predicate];
+	}
+
+By altering `+propertiesPassedToDescendants`, we've permanently removed the `firstName` property from inheritance. Calls to `-resumeInheritingValuesForPropertyName:` will have no effect.
+
+	Person *james = [Person new];
+	james.firstName = @"James";
+	james.lastName = @"Potter";
+	
+	Person *harry = [james descendant];
+	
+	harry.firstName; // nil
+	harry.lastName; // "Potter"
+
 
 ## Installation
 
