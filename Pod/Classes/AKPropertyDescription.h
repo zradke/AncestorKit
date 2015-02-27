@@ -66,7 +66,7 @@ typedef NS_ENUM(NSInteger, AKPropertyType){
      */
     AKPropertyTypeDouble,
     /**
-     *  The property is a BOOL.
+     *  The property is a boolean. Note that BOOL properties may report the AKPropertyTypeChar instead of this.
      */
     AKPropertyTypeBool,
     /**

@@ -29,7 +29,7 @@ typedef struct AKTestStruct
 
 @property (assign) float floatProp;
 @property (assign) double doubleProp;
-@property (assign) BOOL boolProp;
+@property (assign) _Bool boolProp;
 @property (copy) void (^blockProp)(int, NSError *);
 @property (strong) id objProp;
 @property (assign) Class classProp;
