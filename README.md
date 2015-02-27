@@ -147,7 +147,7 @@ Even though we're changing the ancestor, `sectionAttrs` will notify observers th
 	// This will generate a notification
 	sectionAttrs.sectionInsets = UIEdgeInsetsMake(40.0, 0.0, 10.0, 0.0);
 	
-	// This won't generate a notification on sectionAttrs
+	// This won't generate a notification on sectionAttrs now that sectionAttrs has its own sectionInsets value.
 	rootAttrs.sectionInsets = UIEdgeInsetsMake(12.0, 12.0, 12.0, 12.0);
 
 This behavior can be disabled if you want to avoid the overhead of key-value coding using the more verbose initializer and descendant methods:

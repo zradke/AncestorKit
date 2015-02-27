@@ -28,6 +28,9 @@
     return dateFormatter;
 }
 
+
+#pragma mark - Creating ancestors
+
 - (void)testInitRoot
 {
     AKTestPerson *person = [AKTestPerson new];
@@ -37,6 +40,7 @@
     XCTAssertEqualObjects(person.firstName, @"James");
     XCTAssertEqualObjects(person.lastName, @"Potter");
     XCTAssertEqualObjects([person fullName], @"James Potter");
+    XCTAssertTrue(person.inheritsKeyValueNotifications);
 }
 
 - (void)testInitDescendant
@@ -52,7 +56,26 @@
     XCTAssertEqualObjects(personB.firstName, @"Harry");
     XCTAssertEqualObjects(personB.lastName, @"Potter");
     XCTAssertEqualObjects([personB fullName], @"Harry Potter");
+    
+    XCTAssertEqual(personB.ancestor, personA);
+    XCTAssertEqual(personB.inheritsKeyValueNotifications, personA.inheritsKeyValueNotifications);
 }
+
+- (void)testInitDescendantWithDifferentInheritance
+{
+    AKTestPerson *personA = [AKTestPerson new];
+    personA.firstName = @"James";
+    personA.lastName = @"Potter";
+    
+    AKTestPerson *personB = [personA descendantInheritingKeyValueNotifications:NO];
+    personB.firstName = @"Harry";
+    
+    XCTAssertEqual(personB.ancestor, personA);
+    XCTAssertFalse(personB.inheritsKeyValueNotifications);
+}
+
+
+#pragma mark - Property inheritance
 
 - (void)testMethodsUsingProperties
 {
@@ -124,6 +147,9 @@
     XCTAssertEqualObjects(personB.lastName, @"Potter");
 }
 
+
+#pragma mark - KVC
+
 - (void)testInheritedKVC
 {
     AKTestPerson *personA = [AKTestPerson new];
@@ -194,6 +220,9 @@
     
     XCTAssertNoThrow(personA.lastName = @"Potter");
 }
+
+
+#pragma mark - Class mismatches
 
 - (void)testSubclassInheritsFromBaseClass
 {

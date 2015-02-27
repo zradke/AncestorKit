@@ -50,6 +50,13 @@ FOUNDATION_EXPORT NSString *const AKAncestorUnknownPropertyException;
 - (instancetype)initWithAncestor:(AKAncestor *)ancestor inheritKeyValueNotifications:(BOOL)shouldInheritKeyValueNotifications NS_DESIGNATED_INITIALIZER;
 
 /**
+ *  Equivalent to calling -initWithAncestor:inheritKeyValueNotifications: with nil and YES as the arguments.
+ *
+ *  @return An initialized instance of the receiver with no ancestor.
+ */
+- (instancetype)init;
+
+/**
  *  Creates a descendant of the receiver with the same inheritsKeyValueNotifications value as the receiver.
  *
  *  @return A new descendant of the receiver.
@@ -102,6 +109,11 @@ FOUNDATION_EXPORT NSString *const AKAncestorUnknownPropertyException;
 
 
 #pragma mark - Reflection
+
+/**
+ *  This method functions as described in NSObject's documentation, but also performs swizzling on all properties in the propertiesPassedToDescendants set. Because each new subclass of AKAncestor that defines properties will need to perform this swizzling, it's important to invoke the super implementation if you choose to provide your own +initialize method.
+ */
++ (void)initialize NS_REQUIRES_SUPER;
 
 /**
  *  Returns the set of AKPropertyDescription objects representing properties whose values may be inherited or passed to instances.

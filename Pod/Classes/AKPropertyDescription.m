@@ -102,6 +102,8 @@ Class AKPropertyClassFromTypeString(NSString *propertyTypeString)
 
 @implementation AKPropertyDescription
 
+#pragma mark - Lifecycle
+
 + (NSSet *)propertyDescriptionsOfClass:(Class)class
 {
     unsigned int count = 0;
@@ -141,6 +143,10 @@ Class AKPropertyClassFromTypeString(NSString *propertyTypeString)
     NSArray *attributes = [_propertyAttributesString componentsSeparatedByString:@","];
     
     _propertyTypeString = [attributes.firstObject substringFromIndex:1];
+    
+    NSString *ivarAttribute = [[attributes filteredArrayUsingPredicate:[NSPredicate predicateWithFormat:@"SELF BEGINSWITH %@", @"V"]] firstObject];
+    _propertyIvarName = [ivarAttribute substringFromIndex:1];
+    
     _propertyType = AKPropertyTypeFromTypeString(_propertyTypeString);
     
     if (_propertyType == AKPropertyTypeObject)
@@ -266,7 +272,7 @@ Class AKPropertyClassFromTypeString(NSString *propertyTypeString)
 - (id)initWithCoder:(NSCoder *)aDecoder
 {
     NSString *propertyName = [aDecoder decodeObjectOfClass:[NSString class] forKey:NSStringFromSelector(@selector(propertyName))];
-    NSString *propertyAttributes = [aDecoder decodeObjectOfClass:[NSString class] forKey:NSStringFromSelector(@selector(propertyName))];
+    NSString *propertyAttributes = [aDecoder decodeObjectOfClass:[NSString class] forKey:NSStringFromSelector(@selector(propertyAttributesString))];
     
     return [self initWithPropertyName:propertyName propertyAttributes:propertyAttributes];
 }

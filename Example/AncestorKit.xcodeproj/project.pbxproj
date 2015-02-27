@@ -8,6 +8,7 @@
 
 /* Begin PBXBuildFile section */
 		16565C401A9D94CE00836CC2 /* AKTestPersonSubclass.m in Sources */ = {isa = PBXBuildFile; fileRef = 16565C3F1A9D94CE00836CC2 /* AKTestPersonSubclass.m */; };
+		16BC76A41AA01A2B001D08FA /* AKPropertyDescriptionTests.m in Sources */ = {isa = PBXBuildFile; fileRef = 16BC76A31AA01A2B001D08FA /* AKPropertyDescriptionTests.m */; };
 		16C715881A9D3FF400BF04F5 /* AKAncestorTests.m in Sources */ = {isa = PBXBuildFile; fileRef = 16C715871A9D3FF400BF04F5 /* AKAncestorTests.m */; };
 		16C7158C1A9D436500BF04F5 /* AKTestPerson.m in Sources */ = {isa = PBXBuildFile; fileRef = 16C7158B1A9D436500BF04F5 /* AKTestPerson.m */; };
 		1B733A5B91648C9E8E5B9ED5 /* libPods.a in Frameworks */ = {isa = PBXBuildFile; fileRef = D07F37B5BE4F5FF51244FC6F /* libPods.a */; };
@@ -42,6 +43,7 @@
 /* Begin PBXFileReference section */
 		16565C3E1A9D94CE00836CC2 /* AKTestPersonSubclass.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = AKTestPersonSubclass.h; sourceTree = "<group>"; };
 		16565C3F1A9D94CE00836CC2 /* AKTestPersonSubclass.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = AKTestPersonSubclass.m; sourceTree = "<group>"; };
+		16BC76A31AA01A2B001D08FA /* AKPropertyDescriptionTests.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = AKPropertyDescriptionTests.m; sourceTree = "<group>"; };
 		16C715871A9D3FF400BF04F5 /* AKAncestorTests.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = AKAncestorTests.m; sourceTree = "<group>"; };
 		16C7158A1A9D436500BF04F5 /* AKTestPerson.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = AKTestPerson.h; sourceTree = "<group>"; };
 		16C7158B1A9D436500BF04F5 /* AKTestPerson.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = AKTestPerson.m; sourceTree = "<group>"; };
@@ -169,6 +171,7 @@
 			isa = PBXGroup;
 			children = (
 				16C715871A9D3FF400BF04F5 /* AKAncestorTests.m */,
+				16BC76A31AA01A2B001D08FA /* AKPropertyDescriptionTests.m */,
 				16C7158A1A9D436500BF04F5 /* AKTestPerson.h */,
 				16C7158B1A9D436500BF04F5 /* AKTestPerson.m */,
 				16565C3E1A9D94CE00836CC2 /* AKTestPersonSubclass.h */,
@@ -388,6 +391,7 @@
 				16C7158C1A9D436500BF04F5 /* AKTestPerson.m in Sources */,
 				16565C401A9D94CE00836CC2 /* AKTestPersonSubclass.m in Sources */,
 				16C715881A9D3FF400BF04F5 /* AKAncestorTests.m in Sources */,
+				16BC76A41AA01A2B001D08FA /* AKPropertyDescriptionTests.m in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

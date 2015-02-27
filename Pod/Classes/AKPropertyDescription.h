@@ -118,6 +118,11 @@ typedef NS_ENUM(NSInteger, AKPropertyType){
 @property (copy, nonatomic, readonly) NSString *propertyTypeString;
 
 /**
+ *  Returns the property's instance variable name, if it exists. The UTF8 version of this string can be used to retrieve the primitive Ivar.
+ */
+@property (copy, nonatomic, readonly) NSString *propertyIvarName;
+
+/**
  *  Returns the type of the property as described by the AKPropertyType enum. Note that this enum does not account for structs or unions. For those types, please consult the propertyTypeString directly.
  */
 @property (assign, nonatomic, readonly) AKPropertyType propertyType;
