@@ -82,7 +82,16 @@ typedef NS_ENUM(NSInteger, AKPropertyType){
 /**
  *  Class which provides a description of an Objective-C property for easier use when introspecting code.
  */
-@interface AKPropertyDescription : NSObject
+@interface AKPropertyDescription : NSObject <NSCopying, NSSecureCoding>
+
+/**
+ *  Introspects properties defined in the given class and converts them into property descriptions. Note that this does not include properties defined in super classes.
+ *
+ *  @param class The class whose properties should be introspected.
+ *
+ *  @return A set of instances of the receiver describing the properties of the given class.
+ */
++ (NSSet *)propertyDescriptionsOfClass:(Class)class;
 
 /**
  *  Designated initializer. Initializes the receiver with property attributes taken from the given primitive type.
@@ -91,7 +100,7 @@ typedef NS_ENUM(NSInteger, AKPropertyType){
  *
  *  @return An initialized instance of the receiver.
  */
-- (instancetype)initWithProperty:(objc_property_t)property NS_DESIGNATED_INITIALIZER;
+- (instancetype)initWithProperty:(objc_property_t)property;
 
 /**
  *  Returns the property's name. This is what is used for key-value coding.
@@ -116,7 +125,7 @@ typedef NS_ENUM(NSInteger, AKPropertyType){
 /**
  *  If the property is an object property with a distinct class, this will return that class. Otherwise, this will return nil.
  */
-@property (copy, nonatomic, readonly) Class propertyClass;
+@property (strong, nonatomic, readonly) Class propertyClass;
 
 /**
  *  YES if the property is read only. NO if it is read-write.

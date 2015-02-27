@@ -1,5 +1,5 @@
 PODS:
-  - AncestorKit (0.1.0)
+  - AncestorKit (0.2.0)
   - Expecta (0.3.2)
   - FormatterKit (1.8.0):
     - FormatterKit/AddressFormatter (= 1.8.0)
@@ -33,7 +33,7 @@ EXTERNAL SOURCES:
     :path: ../
 
 SPEC CHECKSUMS:
-  AncestorKit: 2776618478db00806ecc31f9c623320d6e36293a
+  AncestorKit: f7cc19a3c3a3ec7050ea310ebeaa89bdf3f9f46c
   Expecta: ee641011fe10aa1855d487b40e4976dac50ec342
   FormatterKit: 547a808c41172136a3f3acb424ac9361d38bb32f
   Specta: 698a58ffa5ec948327d3b92eab50ca58d7f4fbe8

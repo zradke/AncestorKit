@@ -102,17 +102,41 @@ Class AKPropertyClassFromTypeString(NSString *propertyTypeString)
 
 @implementation AKPropertyDescription
 
-- (instancetype)initWithProperty:(objc_property_t)property
++ (NSSet *)propertyDescriptionsOfClass:(Class)class
 {
-    NSParameterAssert(property);
+    unsigned int count = 0;
+    objc_property_t *primitiveProperties = class_copyPropertyList(class, &count);
+    
+    if (!primitiveProperties)
+    {
+        return nil;
+    }
+    
+    NSMutableSet *mutableProperties = [NSMutableSet set];
+    
+    for (unsigned int i = 0; i < count; i++)
+    {
+        AKPropertyDescription *propertyDescription = [[self alloc] initWithProperty:primitiveProperties[i]];
+        [mutableProperties addObject:propertyDescription];
+    }
+    
+    free(primitiveProperties);
+    
+    return [mutableProperties copy];
+}
+
+- (instancetype)initWithPropertyName:(NSString *)propertyName propertyAttributes:(NSString *)propertyAttributes
+{
+    NSParameterAssert(propertyName);
+    NSParameterAssert(propertyAttributes);
     
     if (!(self = [super init]))
     {
         return nil;
     }
     
-    _propertyName = [NSString stringWithUTF8String:property_getName(property)];
-    _propertyAttributesString = [NSString stringWithUTF8String:property_getAttributes(property)];
+    _propertyName = [propertyName copy];
+    _propertyAttributesString = [propertyAttributes copy];
     
     NSArray *attributes = [_propertyAttributesString componentsSeparatedByString:@","];
     
@@ -156,11 +180,24 @@ Class AKPropertyClassFromTypeString(NSString *propertyTypeString)
     return self;
 }
 
+- (instancetype)initWithProperty:(objc_property_t)property
+{
+    NSParameterAssert(property);
+    
+    NSString *propertyName = [NSString stringWithUTF8String:property_getName(property)];
+    NSString *propertyAttributes = [NSString stringWithUTF8String:property_getAttributes(property)];
+    
+    return [self initWithPropertyName:propertyName propertyAttributes:propertyAttributes];
+}
+
 - (instancetype)init
 {
     [self doesNotRecognizeSelector:_cmd];
     return [self initWithProperty:nil];
 }
+
+
+#pragma mark - Description
 
 - (NSString *)description
 {
@@ -171,6 +208,9 @@ Class AKPropertyClassFromTypeString(NSString *propertyTypeString)
 {
     return [NSString stringWithFormat:@"<%@:%p> name: %@, attributes: %@", [self class], self, self.propertyName, self.propertyAttributesString];
 }
+
+
+#pragma mark - Equality
 
 - (BOOL)isEqual:(id)object
 {
@@ -199,6 +239,36 @@ Class AKPropertyClassFromTypeString(NSString *propertyTypeString)
 - (NSUInteger)hash
 {
     return self.propertyName.hash ^ self.propertyAttributesString.hash;
+}
+
+
+#pragma mark - NSCopying
+
+- (id)copyWithZone:(NSZone *)zone
+{
+    return self;
+}
+
+
+#pragma mark - NSSecureCoding
+
++ (BOOL)supportsSecureCoding
+{
+    return YES;
+}
+
+- (void)encodeWithCoder:(NSCoder *)aCoder
+{
+    [aCoder encodeObject:self.propertyName forKey:NSStringFromSelector(@selector(propertyName))];
+    [aCoder encodeObject:self.propertyAttributesString forKey:NSStringFromSelector(@selector(propertyAttributesString))];
+}
+
+- (id)initWithCoder:(NSCoder *)aDecoder
+{
+    NSString *propertyName = [aDecoder decodeObjectOfClass:[NSString class] forKey:NSStringFromSelector(@selector(propertyName))];
+    NSString *propertyAttributes = [aDecoder decodeObjectOfClass:[NSString class] forKey:NSStringFromSelector(@selector(propertyName))];
+    
+    return [self initWithPropertyName:propertyName propertyAttributes:propertyAttributes];
 }
 
 @end

@@ -17,7 +17,7 @@ static void *AKAncestorKVOContext = &AKAncestorKVOContext;
 
 @interface AKAncestor ()
 
-@property (strong, nonatomic, readonly) NSRecursiveLock *ak_lock;
+@property (strong, nonatomic, readonly) dispatch_queue_t ak_queue;
 @property (strong, nonatomic, readonly) NSMutableSet *ak_ignoredPropertyNames;
 
 @end
@@ -48,7 +48,8 @@ static void *AKAncestorKVOContext = &AKAncestorKVOContext;
     }
     
     _ancestor = ancestor;
-    _ak_lock = [NSRecursiveLock new];
+    NSString *queueName = [NSString stringWithFormat:@"com.zachradke.ancestorKit.queue.%p", self];
+    _ak_queue = dispatch_queue_create([queueName UTF8String], DISPATCH_QUEUE_CONCURRENT);
     _ak_ignoredPropertyNames = [NSMutableSet set];
     
     _inheritsKeyValueNotifications = shouldInheritKeyValueNotifications;
@@ -88,32 +89,43 @@ static void *AKAncestorKVOContext = &AKAncestorKVOContext;
 
 - (void)stopInheritingValuesForPropertyName:(NSString *)propertyName
 {
-    NSPredicate *predicate = [NSPredicate predicateWithFormat:@"%K == %@", NSStringFromSelector(@selector(propertyName)), propertyName];
+    // Create a copy to prevent any shady business when we dispatch async.
+    NSString *name = [propertyName copy];
+    
+    NSPredicate *predicate = [NSPredicate predicateWithFormat:@"%K == %@", NSStringFromSelector(@selector(propertyName)), name];
     if ([[[self class] propertiesPassedToDescendants] filteredSetUsingPredicate:predicate].count == 0)
     {
-        [NSException raise:AKAncestorUnknownPropertyException format:@"No property with the name \"%@\" is being inherited by %@.", propertyName, [self class]];
+        [NSException raise:AKAncestorUnknownPropertyException format:@"No property with the name \"%@\" is being inherited by %@.", name, [self class]];
     }
     
-    [self.ak_lock lock];
-    [self.ak_ignoredPropertyNames addObject:propertyName];
-    [self.ak_lock unlock];
+    dispatch_barrier_async(self.ak_queue, ^{
+        [self.ak_ignoredPropertyNames addObject:name];
+    });
 }
 
 - (void)resumeInheritingValuesForPropertyName:(NSString *)propertyName
 {
-    [self.ak_lock lock];
-    [self.ak_ignoredPropertyNames removeObject:propertyName];
-    [self.ak_lock unlock];
+    // Create a copy to prevent any shady business when we dispatch async.
+    NSString *name = [propertyName copy];
+    
+    dispatch_barrier_async(self.ak_queue, ^{
+        [self.ak_ignoredPropertyNames removeObject:name];
+    });
 }
 
 - (NSSet *)propertiesIgnoringInheritedValues
 {
-    [self.ak_lock lock];
-    NSPredicate *predicate = [NSPredicate predicateWithFormat:@"%K IN %@", NSStringFromSelector(@selector(propertyName)), self.ak_ignoredPropertyNames];
-    [self.ak_lock unlock];
+    __block NSSet *properties;
+    dispatch_sync(self.ak_queue, ^{
+        NSPredicate *predicate = [NSPredicate predicateWithFormat:@"%K IN %@", NSStringFromSelector(@selector(propertyName)), self.ak_ignoredPropertyNames];
+        properties = [[[self class] propertiesPassedToDescendants] filteredSetUsingPredicate:predicate];
+    });
     
-    return [[[self class] propertiesPassedToDescendants] filteredSetUsingPredicate:predicate];
+    return properties;
 }
+
+
+#pragma mark - Reflection
 
 + (NSSet *)propertiesPassedToDescendants
 {
@@ -141,11 +153,11 @@ static void *AKAncestorKVOContext = &AKAncestorKVOContext;
     
     NSString *padding = [@"" stringByPaddingToLength:(level + 1) withString:@"\t" startingAtIndex:0];
     
-    NSString *inheritedPropertiesDescription = [self _descriptionOfInheritedPropertiesWithLocale:locale indent:level];
-    if (inheritedPropertiesDescription.length > 0)
+    NSString *propertiesDescription = [self _descriptionOfPropertiesWithLocale:locale indent:level];
+    if (propertiesDescription.length > 0)
     {
         [description appendFormat:@"\n%@Properties", padding];
-        [description appendString:inheritedPropertiesDescription];
+        [description appendString:propertiesDescription];
     }
     
     if (self.ancestor)
@@ -167,9 +179,10 @@ static void *AKAncestorKVOContext = &AKAncestorKVOContext;
         return;
     }
     
-    [self.ak_lock lock];
-    BOOL isIgnoredProperty = [self.ak_ignoredPropertyNames containsObject:keyPath];
-    [self.ak_lock unlock];
+    __block BOOL isIgnoredProperty;
+    dispatch_sync(self.ak_queue, ^{
+        isIgnoredProperty = [self.ak_ignoredPropertyNames containsObject:keyPath];
+    });
     
     // If we're ignoring inheritance on this property, then it's value won't change with key value notifications
     if (isIgnoredProperty)
@@ -250,7 +263,7 @@ static void *AKAncestorKVOContext = &AKAncestorKVOContext;
     }
 }
 
-- (NSString *)_descriptionOfInheritedPropertiesWithLocale:(id)locale indent:(NSUInteger)level
+- (NSString *)_descriptionOfPropertiesWithLocale:(id)locale indent:(NSUInteger)level
 {
     NSMutableString *description = [NSMutableString string];
     
@@ -263,8 +276,7 @@ static void *AKAncestorKVOContext = &AKAncestorKVOContext;
         propertyValue = [self valueForKey:propertyName];
         if (propertyValue)
         {
-            NSUInteger whitespaceLength = [@"\t" length] * (level + 2);
-            NSString *padding = [@"" stringByPaddingToLength:whitespaceLength withString:@"\t" startingAtIndex:0];
+            NSString *padding = [@"" stringByPaddingToLength:(level + 2) withString:@"\t" startingAtIndex:0];
             NSString *valueDescription = [[self class] _descriptionOfValue:propertyValue withLocale:locale indent:level];
             
             [description appendFormat:@"\n%@%@: %@,", padding, propertyName, valueDescription];
@@ -304,35 +316,22 @@ static void *AKAncestorKVOContext = &AKAncestorKVOContext;
 
 + (NSSet *)_definedProperties
 {
+    // This isn't thread safe, but it also probably doesn't need to be since this method should always return the same objects regardless.
     NSSet *properties = objc_getAssociatedObject(self, _cmd);
     if (properties)
     {
         return properties;
     }
     
-    NSMutableSet *mutableProperties = [NSMutableSet set];
+    properties = [AKPropertyDescription propertyDescriptionsOfClass:self];
     
-    unsigned int count = 0;
-    objc_property_t *primitiveProperties = class_copyPropertyList([self class], &count);
-    
-    if (primitiveProperties)
-    {
-        for (unsigned int i = 0; i < count; i++)
-        {
-            AKPropertyDescription *propertyDescription = [[AKPropertyDescription alloc] initWithProperty:primitiveProperties[i]];
-            [mutableProperties addObject:propertyDescription];
-        }
-        
-        free(primitiveProperties);
-    }
-    
-    properties = [mutableProperties copy];
     objc_setAssociatedObject(self, _cmd, properties, OBJC_ASSOCIATION_COPY);
     return properties;
 }
 
 + (NSSet *)_allInheritedProperties
 {
+    // This isn't thread safe, but it also probably doesn't need to be since this method should always return the same objects regardless.
     NSSet *properties = objc_getAssociatedObject(self, _cmd);
     if (properties)
     {
@@ -394,9 +393,10 @@ static void *AKAncestorKVOContext = &AKAncestorKVOContext;
         __unsafe_unretained id returnValue;
         [invocation getReturnValue:&returnValue];
         
-        [[s ak_lock] lock];
-        BOOL isIgnoredProperty = [[s ak_ignoredPropertyNames] containsObject:propertyName];
-        [[s ak_lock] unlock];
+        __block BOOL isIgnoredProperty;
+        dispatch_sync([s ak_queue], ^{
+            isIgnoredProperty = [[s ak_ignoredPropertyNames] containsObject:propertyName];
+        });
         
         // If there isn't a return value, we'll check the ancestor for a value
         if (!returnValue && [s ancestor] && !isIgnoredProperty)

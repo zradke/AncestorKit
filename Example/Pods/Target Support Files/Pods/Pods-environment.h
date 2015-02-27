@@ -9,7 +9,7 @@
 // AncestorKit
 #define COCOAPODS_POD_AVAILABLE_AncestorKit
 #define COCOAPODS_VERSION_MAJOR_AncestorKit 0
-#define COCOAPODS_VERSION_MINOR_AncestorKit 1
+#define COCOAPODS_VERSION_MINOR_AncestorKit 2
 #define COCOAPODS_VERSION_PATCH_AncestorKit 0
 
 // FormatterKit
