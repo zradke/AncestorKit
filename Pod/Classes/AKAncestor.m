@@ -24,14 +24,156 @@ static void *AKAncestorKVOContext = &AKAncestorKVOContext;
 
 @implementation AKAncestor
 
-+ (void)initialize
+#pragma mark - Swizzling
+
+static NSArray *AKAncestorSubclasses()
 {
-    // We iterate through all the inherited properties and use them to create swizzled getters and setters. Note that we do the swizzling in +initialize so that every subclass of AKAncestor has this called on their own class with their own properties.
-    for (AKPropertyDescription *property in [self propertiesPassedToDescendants])
+    unsigned int classCount;
+    Class *classes = objc_copyClassList(&classCount);
+    
+    NSMutableArray *subclasses = [NSMutableArray array];
+    for (unsigned int i = 0; i < classCount; i++)
     {
-        [self _swizzleGetterForObjectProperty:property];
+        Class class = classes[i];
+        
+        if (class == [AKAncestor class])
+        {
+            continue;
+        }
+        
+        BOOL shouldAddClass = NO;
+        Class currentClass = class;
+        while (currentClass)
+        {
+            if (currentClass == [AKAncestor class])
+            {
+                shouldAddClass = YES;
+                break;
+            }
+            
+            currentClass = class_getSuperclass(currentClass);
+        }
+        
+        if (!shouldAddClass)
+        {
+            continue;
+        }
+        
+        // The order of these classes is important only in the case of subclasses. If ClassA is a subclass of AKAncestor, and ClassB is a subclass of ClassA, then ClassA's properties must be swizzled before ClassB's. However, if ClassC is also a direct subclass of AKAncestor, it doesn't matter whether its properties are swizzled before ClassA or ClassB. If this isn't done, and ClassB's properties are swizzled before ClassA, then ClassB's property implementations will be an infinite loop due to double swizzling.
+        NSInteger insertionIndex = 0;
+        Class superclass = class_getSuperclass(class);
+        while (superclass && superclass != [AKAncestor class])
+        {
+            NSInteger foundIndex = [subclasses indexOfObject:superclass];
+            if (foundIndex != NSNotFound && (foundIndex + 1) > insertionIndex)
+            {
+                insertionIndex = (foundIndex + 1);
+            }
+            
+            superclass = class_getSuperclass(superclass);
+        }
+        
+        [subclasses insertObject:class atIndex:insertionIndex];
     }
+    
+    return subclasses;
 }
+
+static SEL AKAncestorSwizzledPropertyGetter(AKPropertyDescription *property)
+{
+    NSCParameterAssert(property);
+    
+    NSString *selectorString = [NSString stringWithFormat:@"_ak_%@", NSStringFromSelector(property.propertyGetter)];
+    return NSSelectorFromString(selectorString);
+}
+
+static void AKAncestorSwizzlePropertyGetter(Class class, AKPropertyDescription *property)
+{
+    NSCParameterAssert(class);
+    NSCParameterAssert(property);
+    
+    if (!property.propertyType == AKPropertyTypeObject)
+    {
+        [NSException raise:AKAncestorNonObjectPropertyException format:@"Property \"%@\" is not an object property and cannot be inherited by %@", property.propertyName, class];
+        return;
+    }
+    
+    SEL originalGetter = property.propertyGetter;
+    SEL swizzledGetter = AKAncestorSwizzledPropertyGetter(property);
+    
+    Method originalMethod = class_getInstanceMethod(class, originalGetter);
+    Method swizzledMethod = class_getInstanceMethod(class, swizzledGetter);
+    
+    // We only swizzle each property once, so if a method has been registered we bail early
+    if (swizzledMethod)
+    {
+        return;
+    }
+    
+    IMP originalImplementation = class_getMethodImplementation(class, originalGetter);
+    
+    NSString *propertyName = property.propertyName;
+    IMP swizzledImplementation = imp_implementationWithBlock(^id (id self) {
+        NSInvocation *invocation = [NSInvocation invocationWithMethodSignature:[self methodSignatureForSelector:swizzledGetter]];
+        
+        // Using the swizzled getter will act as though we are retreiving the property normally.
+        [invocation setSelector:swizzledGetter];
+        [invocation invokeWithTarget:self];
+        
+        __unsafe_unretained id returnValue;
+        [invocation getReturnValue:&returnValue];
+        
+        __block BOOL isIgnoredProperty;
+        dispatch_sync([self ak_queue], ^{
+            isIgnoredProperty = [[self ak_ignoredPropertyNames] containsObject:propertyName];
+        });
+        
+        // If there isn't a return value, we'll check the ancestor for a value
+        if (!returnValue && [self ancestor] && !isIgnoredProperty)
+        {
+            // Note that we change the selector to the original getter, this ensures that if the ancestor doesn't have a value it can continue down the chain.
+            [invocation setSelector:originalGetter];
+            [invocation invokeWithTarget:[self ancestor]];
+            [invocation getReturnValue:&returnValue];
+        }
+        
+        return returnValue;
+    });
+    
+    // Though this really shouldn't happen, first we try and add a method with the original selector to the class.
+    if (!class_addMethod(class, originalGetter, swizzledImplementation, method_getTypeEncoding(originalMethod)))
+    {
+        // If we couldn't add the method because it was already part of the class, then we simply replace the original implementation with our swizzled one.
+        originalImplementation = class_replaceMethod(class, originalGetter, swizzledImplementation, method_getTypeEncoding(originalMethod));
+    }
+    
+    // Either way, this should be the first time we add the swizzled selector.
+    class_addMethod(class, swizzledGetter, originalImplementation, method_getTypeEncoding(originalMethod));
+}
+
++ (void)load
+{
+    // Following the wisdom of http://nshipster.com/method-swizzling/ we put all swizzling in +load and a dispatch_once block
+    static dispatch_once_t onceToken;
+    dispatch_once(&onceToken, ^{
+        
+        // Following the wisdom of https://www.mikeash.com/pyblog/friday-qa-2009-05-22-objective-c-class-loading-and-initialization.html we wrap this in an autorelease pool since we're creating autoreleased objects in it.
+        @autoreleasepool {
+            
+            // We iterate through each subclass of AKAncestor and swizzle it's properties' getter methods.
+            for (Class subclass in AKAncestorSubclasses())
+            {
+                NSSet *propertiesToSwizzle = [subclass propertiesPassedToDescendants];
+                for (AKPropertyDescription *property in propertiesToSwizzle)
+                {
+                    AKAncestorSwizzlePropertyGetter(subclass, property);
+                }
+            }
+            
+        }
+    });
+}
+
 
 #pragma mark - Lifecyle
 
@@ -196,13 +338,13 @@ static void *AKAncestorKVOContext = &AKAncestorKVOContext;
     if (!property)
     {
         // Somehow we're observing an unknown property!
-        [NSException raise:AKAncestorUnknownPropertyException format:@"No property was found on %@ with the name \"%@\" despite it having key-value observations set.", [self class], keyPath];
+        [NSException raise:AKAncestorUnknownPropertyException format:@"Received key-value notification for unknown property \"%@\" in %@", keyPath, [self class]];
         
         [object removeObserver:self forKeyPath:keyPath context:context];
         return;
     }
     
-    SEL swizzledGetter = [[self class] _swizzledGetterForProperty:property];
+    SEL swizzledGetter = AKAncestorSwizzledPropertyGetter(property);
     NSInvocation *invocation = [NSInvocation invocationWithMethodSignature:[self methodSignatureForSelector:swizzledGetter]];
     [invocation setSelector:swizzledGetter];
     
@@ -314,21 +456,6 @@ static void *AKAncestorKVOContext = &AKAncestorKVOContext;
     return valueDescription;
 }
 
-+ (NSSet *)_definedProperties
-{
-    // This isn't thread safe, but it also probably doesn't need to be since this method should always return the same objects regardless.
-    NSSet *properties = objc_getAssociatedObject(self, _cmd);
-    if (properties)
-    {
-        return properties;
-    }
-    
-    properties = [AKPropertyDescription propertyDescriptionsOfClass:self];
-    
-    objc_setAssociatedObject(self, _cmd, properties, OBJC_ASSOCIATION_COPY);
-    return properties;
-}
-
 + (NSSet *)_allInheritedProperties
 {
     // This isn't thread safe, but it also probably doesn't need to be since this method should always return the same objects regardless.
@@ -343,82 +470,13 @@ static void *AKAncestorKVOContext = &AKAncestorKVOContext;
     Class currentClass = self;
     while (currentClass && currentClass != [AKAncestor class])
     {
-        [mutableProperties unionSet:[currentClass _definedProperties]];
+        [mutableProperties unionSet:[AKPropertyDescription propertyDescriptionsOfClass:currentClass]];
         currentClass = [currentClass superclass];
     }
     
     properties = [mutableProperties copy];
     objc_setAssociatedObject(self, _cmd, properties, OBJC_ASSOCIATION_COPY);
     return properties;
-}
-
-+ (SEL)_swizzledGetterForProperty:(AKPropertyDescription *)property
-{
-    NSString *selectorString = [NSString stringWithFormat:@"_ak_%@", NSStringFromSelector(property.propertyGetter)];
-    return NSSelectorFromString(selectorString);
-}
-
-+ (void)_swizzleGetterForObjectProperty:(AKPropertyDescription *)property
-{
-    NSParameterAssert(property);
-    
-    if (!property.propertyType == AKPropertyTypeObject)
-    {
-        [NSException raise:AKAncestorNonObjectPropertyException format:@"Property \"%@\" is not an object property and cannot be inherited by %@", property.propertyName, self];
-        return;
-    }
-    
-    SEL originalGetter = property.propertyGetter;
-    SEL swizzledGetter = [self _swizzledGetterForProperty:property];
-    
-    Method originalMethod = class_getInstanceMethod([self class], originalGetter);
-    Method swizzledMethod = class_getInstanceMethod([self class], swizzledGetter);
-    
-    // We only swizzle each property once, so if a method has been registered we bail early
-    if (swizzledMethod)
-    {
-        return;
-    }
-    
-    IMP originalImplementation = class_getMethodImplementation([self class], originalGetter);
-    
-    NSString *propertyName = property.propertyName;
-    IMP swizzledImplementation = imp_implementationWithBlock(^id (id s) {
-        NSInvocation *invocation = [NSInvocation invocationWithMethodSignature:[s methodSignatureForSelector:swizzledGetter]];
-        
-        // Using the swizzled getter will act as though we are retreiving the property normally.
-        [invocation setSelector:swizzledGetter];
-        [invocation invokeWithTarget:s];
-        
-        __unsafe_unretained id returnValue;
-        [invocation getReturnValue:&returnValue];
-        
-        __block BOOL isIgnoredProperty;
-        dispatch_sync([s ak_queue], ^{
-            isIgnoredProperty = [[s ak_ignoredPropertyNames] containsObject:propertyName];
-        });
-        
-        // If there isn't a return value, we'll check the ancestor for a value
-        if (!returnValue && [s ancestor] && !isIgnoredProperty)
-        {
-            // Note that we change the selector to the original getter, this ensures that if the ancestor doesn't have a value it can continue down the chain.
-            [invocation setSelector:originalGetter];
-            [invocation invokeWithTarget:[s ancestor]];
-            [invocation getReturnValue:&returnValue];
-        }
-        
-        return returnValue;
-    });
-    
-    // Though this really shouldn't happen, first we try and add a method with the original selector to this class.
-    if (!class_addMethod([self class], originalGetter, swizzledImplementation, method_getTypeEncoding(originalMethod)))
-    {
-        // If we couldn't add the method because it was already part of this class, then we simply replace the original implementation with our swizzled one.
-        originalImplementation = class_replaceMethod([self class], originalGetter, swizzledImplementation, method_getTypeEncoding(originalMethod));
-    }
-    
-    // Either way, this should be the first time we add the swizzled selector.
-    class_addMethod([self class], swizzledGetter, originalImplementation, method_getTypeEncoding(originalMethod));
 }
 
 @end

@@ -24,7 +24,7 @@ FOUNDATION_EXPORT NSString *const AKAncestorUnknownPropertyException;
  *
  *  AKAncestor also provides special attention to KVC if your descendants and ancestors need it. If a descendant is inheriting a property value from an ancestor, and that ancestor changes it's property value, the descendant also sends out a key-value notification so any observers on the descendant are properly informed. This behavior can also be disabled per-instance if KVC is not necessary. The inheritsKeyValueNotifications property indicates whether the receiver was configured to vend these notifications or not.
  *
- *  Subclasses should be aware that only object properties can be inherited. This happens automatically when a subclass is created, and the properties which can be inherited form the +propertiesPassedToDescendants set. Also, the property getters are swizzled by AKAncestor when the class initializes, so while a subclass is free to provide a custom getter implementation, swizzling the methods again may result in odd behavior. This also means that properties added at runtime are not supported.
+ *  Subclasses should be aware that only object properties can be inherited. This happens automatically when a subclass is created, and the properties which can be inherited form the +propertiesPassedToDescendants set.
  */
 @interface AKAncestor : NSObject
 
@@ -89,7 +89,9 @@ FOUNDATION_EXPORT NSString *const AKAncestorUnknownPropertyException;
 #pragma mark - Limiting property inheritance
 
 /**
- *  Stops the receiver from inheriting property values associated with the given property name. Note that this is only applicable when the requested property is nil on the receiver. Otherwise, the overriden property value is returned as usual. Passing the same property name multiple times will have no effect on subsequent calls.
+ *  Stops the receiver from inheriting property values associated with the given property name. Note that this is only applicable when the requested property is nil on the receiver. Otherwise, the overriden property value is returned as usual. Passing the same property name multiple times without resuming inheritance of values will have no effect after the first call.
+ *
+ *  @see -resumeInheritingValuesForPropertyName:, propertiesIgnoringInheritedValues
  *
  *  @param propertyName The name of the property which should stop inheriting values. This must describe the propertyName of a member of the +propertiesPassedToDescendants set, or an AKAncestorUnknownPropertyException exception will be thrown.
  */
@@ -98,12 +100,16 @@ FOUNDATION_EXPORT NSString *const AKAncestorUnknownPropertyException;
 /**
  *  Resumes inheriting property values associated with the given property name. Note that this is only applicable when the requested property is nil on the receiver. Otherwise the overriden property value is returned as usual. Passing a property name which was not stopped from inheriting values has no effect.
  *
+ *  @see -stopInheritingValuesForPropertyName:, propertiesIgnoringInheritedValues
+ *
  *  @param propertyName The name of the property which should resume inheriting values from its ancestors.
  */
 - (void)resumeInheritingValuesForPropertyName:(NSString *)propertyName;
 
 /**
  *  Returns a set of AKPropertyDescription objects which are set to ignore inherited values. Note that this does not refer to properties of the receiver which have value overrides, but rather properties whose names were passed to the -stopInheritingValuesForPropertyName: method.
+ *
+ *  @see -stopInheritingValuesForPropertyName:, -resumeInheritingValuesForPropertyName:
  */
 @property (copy, nonatomic, readonly) NSSet *propertiesIgnoringInheritedValues;
 
@@ -111,15 +117,10 @@ FOUNDATION_EXPORT NSString *const AKAncestorUnknownPropertyException;
 #pragma mark - Reflection
 
 /**
- *  This method functions as described in NSObject's documentation, but also performs swizzling on all properties in the propertiesPassedToDescendants set. Because each new subclass of AKAncestor that defines properties will need to perform this swizzling, it's important to invoke the super implementation if you choose to provide your own +initialize method.
- */
-+ (void)initialize NS_REQUIRES_SUPER;
-
-/**
  *  Returns the set of AKPropertyDescription objects representing properties whose values may be inherited or passed to instances.
  *
- *  By default this set includes all AKPropertyTypeObject properties of the receiving class up to and excluding those of AKAncestor. Subclasses can override this method to remove properties which should never be inheritable. Subclasses should always utilize super's implementation as a starting point. It is dangerous to add new properties to this set unless you configure your subclass to handle dynamic method resolution. Attempting to add non-object properties to this method will result in an AKAncestorNonObjectPropertyException exception being raised when the class attempts to initialize.
+ *  By default this set includes all AKPropertyTypeObject properties of the receiving class up to and excluding those of AKAncestor. Subclasses can override this method to remove properties which should never be inheritable. Subclasses should always utilize super's implementation as a starting point. It is dangerous to add new properties to this set unless you configure your subclass to handle dynamic method resolution. Attempting to add non-object properties to this method will result in an AKAncestorNonObjectPropertyException exception being raised when AKAncestor loads.
  */
-+ (NSSet *)propertiesPassedToDescendants NS_REQUIRES_SUPER;
++ (NSSet *)propertiesPassedToDescendants;
 
 @end

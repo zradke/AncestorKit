@@ -2,7 +2,7 @@
 //  AKPropertyDescriptionTests.m
 //  AncestorKit
 //
-//  Created by Zachary Radke | AMDU on 2/26/15.
+//  Created by Zach Radke on 2/24/15.
 //  Copyright (c) 2015 Zach Radke. All rights reserved.
 //
 

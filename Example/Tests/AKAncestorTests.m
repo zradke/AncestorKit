@@ -2,14 +2,13 @@
 //  AKAncestorTests.m
 //  AncestorKit
 //
-//  Created by Zachary Radke | AMDU on 2/24/15.
+//  Created by Zach Radke on 2/24/15.
 //  Copyright (c) 2015 Zach Radke. All rights reserved.
 //
 
 #import <AncestorKit/AncestorKit.h>
 #import <XCTest/XCTest.h>
-#import "AKTestPerson.h"
-#import "AKTestPersonSubclass.h"
+#import "AKTestFixtures.h"
 
 @interface AKAncestorTests : XCTestCase
 
@@ -147,6 +146,53 @@
     XCTAssertEqualObjects(personB.lastName, @"Potter");
 }
 
+- (void)testNoPrimitivePropertyInheritance
+{
+    AKTestPersonDeepSubclass *personA = [AKTestPersonDeepSubclass new];
+    personA.firstName = @"Lily";
+    personA.lastName = @"Potter";
+    
+    AKTestPersonDeepSubclass *personB = [personA descendant];
+    personB.firstName = @"Harry";
+    
+    personA.isMarried = YES;
+    
+    XCTAssertTrue(personA.isMarried);
+    XCTAssertFalse(personB.isMarried);
+    
+    XCTAssertEqualObjects([personA fullName], @"LILY Potter");
+    XCTAssertEqualObjects([personB fullName], @"HARRY Potter");
+}
+
+- (void)testOverridPropertiesAvailableForInheritance
+{
+    AKTestPersonDeepSubclass *personA = [AKTestPersonDeepSubclass new];
+    personA.firstName = @"Harry";
+    personA.middleName = @"James";
+    personA.lastName = @"Potter";
+    
+    AKTestPersonDeepSubclass *personB = [personA descendant];
+    personB.firstName = @"Lily";
+    
+    XCTAssertEqualObjects([personA fullName], @"HARRY James Potter");
+    XCTAssertEqualObjects([personB fullName], @"LILY Potter");
+}
+
+- (void)testComposedPrimitivePropertyInheritance
+{
+    AKCollectionViewAttributes *attrsA = [AKCollectionViewAttributes new];
+    attrsA.sectionInsets = UIEdgeInsetsMake(15.0, 15.0, 15.0, 15.0);
+    
+    AKCollectionViewAttributes *attrsB = [attrsA descendant];
+    
+    XCTAssertTrue(UIEdgeInsetsEqualToEdgeInsets(attrsA.sectionInsets, attrsB.sectionInsets));
+    
+    attrsB.sectionInsets = UIEdgeInsetsMake(0.0, 20.0, 0.0, 20.0);
+    
+    XCTAssertTrue(UIEdgeInsetsEqualToEdgeInsets(attrsA.sectionInsets, UIEdgeInsetsMake(15.0, 15.0, 15.0, 15.0)));
+    XCTAssertTrue(UIEdgeInsetsEqualToEdgeInsets(attrsB.sectionInsets, UIEdgeInsetsMake(0.0, 20.0, 0.0, 20.0)));
+}
+
 
 #pragma mark - KVC
 
@@ -198,6 +244,20 @@
     
     XCTAssertNoThrow(personA.birthDate = [dateFormatter dateFromString:@"1980/07/31"]);
     XCTAssertNotNil(personB);
+}
+
+- (void)testComposedPrimitivePropertyKVC
+{
+    AKCollectionViewAttributes *attrsA = [AKCollectionViewAttributes new];
+    attrsA.sectionInsets = UIEdgeInsetsMake(15.0, 15.0, 15.0, 15.0);
+    
+    AKCollectionViewAttributes *attrsB = [attrsA descendant];
+    
+    [self keyValueObservingExpectationForObject:attrsB keyPath:NSStringFromSelector(@selector(sectionInsets)) expectedValue:[NSValue valueWithUIEdgeInsets:UIEdgeInsetsMake(12.0, 12.0, 12.0, 12.0)]];
+    
+    attrsA.sectionInsets = UIEdgeInsetsMake(12.0, 12.0, 12.0, 12.0);
+    
+    [self waitForExpectationsWithTimeout:5.0 handler:nil];
 }
 
 - (void)testKVCRemovedOnDealloc

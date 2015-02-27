@@ -118,7 +118,7 @@ If you can find a way to convert your primitive types into objects, you can use 
 		}
 	}
 	
-	- (NSSet *)keyPathsAffectingSectionInsets
+	- (NSSet *)keyPathsForValuesAffectingSectionInsets
 	{
 		return [NSSet setWithObject:@"sectionInsetsValue"];
 	}
@@ -167,9 +167,15 @@ it, simply add the following line to your Podfile:
 
 ## Details and Caveats
 
-AncestorKit uses the Objective-C runtime to inspect subclasses of `AKAncestor`, locate properties which can be inherited in instances, and swizzle those property getters. For the most part, consumers won't need to worry about this, but if you're planning on using a lot of runtime trickery yourself, be aware that the properties are swizzled in the `+initialize` method (so each subclass will swizzle its own properties) so if you override this method in your subclass of `AKAncestor`, you **must** call `[super initialize]`. This also means that any properties added dynamically through the runtime will not be inheritable.
+AncestorKit uses the Objective-C runtime to inspect subclasses of `AKAncestor`, locate properties which can be inherited in instances, and swizzle those property getters. For the most part, consumers won't need to worry about this, but if you're planning on using a lot of runtime trickery yourself, be aware that `[AKAncestor load]` operates as follows:
 
-Only object properties are eligable for inheritance. This is because object properties can be nil, which indicates that there is no value. AncestorKit relies on the concept of "no-value" to determine when it should search ancestors for a possible value. This makes it hard if not impossible to work with primitive types, since a `BOOL` property can be `NO` because it hasn't been set, or `NO` because it was intentionally set that way.
+* All subclasses of `AKAncestor` are located and ordered.
+* Each subclass is sent the `+propertiesPassedToDescendants` message.
+* In the resulting set, each `AKPropertyDescription`'s defined `propertyGetter` is swizzled in the subclass.
+
+This means that special care should be taken in the `+propertiesPassedToDescendants` method to ensure that only valid properties are returned. Since this all occurs within the `[AKAncestor load]` method, this also means that runtime added properties and classes are not supported, as they will be added after `AKAncestor` has completed loading.
+
+Only object properties are eligable for inheritance. This is because object properties can be `nil`, which indicates that there is no value. AncestorKit relies on the concept of "no-value" to determine when it should search ancestors for a possible value. This makes it hard if not impossible to work with primitive types, since a `BOOL` property can be `NO` because it hasn't been set, or `NO` because it was intentionally set that way.
 
 ## Contributing
 
