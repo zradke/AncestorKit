@@ -63,7 +63,7 @@ static NSArray *AKAncestorSubclasses()
             continue;
         }
         
-        // The order of these classes is important only in the case of subclasses. If ClassA is a subclass of AKAncestor, and ClassB is a subclass of ClassA, then ClassA's properties must be swizzled before ClassB's. However, if ClassC is also a direct subclass of AKAncestor, it doesn't matter whether its properties are swizzled before ClassA or ClassB. If this isn't done, and ClassB's properties are swizzled before ClassA, then ClassB's property implementations will be an infinite loop due to double swizzling.
+        // The order of these classes is important only in the case of subclasses. If ClassA is a subclass of AKAncestor, and ClassB is a subclass of ClassA, then ClassA's properties must be swizzled before ClassB's. However, if ClassC is also a direct subclass of AKAncestor, it doesn't matter whether its properties are swizzled before ClassA or ClassB. If this isn't done, and ClassB's properties are swizzled before ClassA, then ClassB's property implementations will be an infinite loop due to double swizzling. We could fix this by only swizzling the result of -intersectSet: between the class' +propertiesPassedToDescendants and it's defined properties, but this would prevent users from adding to +propertiesPassedToDescendants which may be too hand-holdy.
         NSInteger insertionIndex = 0;
         Class superclass = class_getSuperclass(class);
         while (superclass && superclass != [AKAncestor class])
@@ -233,7 +233,7 @@ static void AKAncestorSwizzlePropertyGetter(Class class, AKPropertyDescription *
 
 - (void)stopInheritingValuesForPropertyName:(NSString *)propertyName
 {
-    // Create a copy to prevent any shady business when we dispatch async.
+    // Create a copy to prevent any shady business
     NSString *name = [propertyName copy];
     
     NSPredicate *predicate = [NSPredicate predicateWithFormat:@"%K == %@", NSStringFromSelector(@selector(propertyName)), name];
@@ -249,7 +249,7 @@ static void AKAncestorSwizzlePropertyGetter(Class class, AKPropertyDescription *
 
 - (void)resumeInheritingValuesForPropertyName:(NSString *)propertyName
 {
-    // Create a copy to prevent any shady business when we dispatch async.
+    // Create a copy to prevent any shady business
     NSString *name = [propertyName copy];
     
     OSSpinLockLock(&_ak_spinLock);
@@ -394,10 +394,10 @@ static void AKAncestorSwizzlePropertyGetter(Class class, AKPropertyDescription *
 {
     NSParameterAssert(ancestor);
     
-    NSMutableSet *propertiesToObserve = [NSMutableSet setWithSet:[[self class] propertiesPassedToDescendants]];
-    [propertiesToObserve intersectSet:[[ancestor class] propertiesPassedToDescendants]];
+    NSMutableSet *propertiesToUnobserve = [NSMutableSet setWithSet:[[self class] propertiesPassedToDescendants]];
+    [propertiesToUnobserve intersectSet:[[ancestor class] propertiesPassedToDescendants]];
     
-    for (AKPropertyDescription *propertyDescription in propertiesToObserve)
+    for (AKPropertyDescription *propertyDescription in propertiesToUnobserve)
     {
         [ancestor removeObserver:self forKeyPath:propertyDescription.propertyName context:AKAncestorKVOContext];
     }
@@ -407,6 +407,10 @@ static void AKAncestorSwizzlePropertyGetter(Class class, AKPropertyDescription *
 {
     NSMutableString *description = [NSMutableString string];
     
+    OSSpinLockLock(&_ak_spinLock);
+    NSSet *ignoredPropertyNames = [NSSet setWithSet:self.ak_ignoredPropertyNames];
+    OSSpinLockUnlock(&_ak_spinLock);
+    
     NSSet *propertyNames = [[[self class] _allInheritedProperties] valueForKey:NSStringFromSelector(@selector(propertyName))];
     NSArray *sortedPropertyNames = [[propertyNames allObjects] sortedArrayUsingSelector:@selector(caseInsensitiveCompare:)];
     
@@ -414,12 +418,25 @@ static void AKAncestorSwizzlePropertyGetter(Class class, AKPropertyDescription *
     for (NSString *propertyName in sortedPropertyNames)
     {
         propertyValue = [self valueForKey:propertyName];
+        
+        if (!propertyValue && [ignoredPropertyNames containsObject:propertyName])
+        {
+            propertyValue = @"nil";
+        }
+        
         if (propertyValue)
         {
             NSString *padding = [@"" stringByPaddingToLength:(level + 2) withString:@"\t" startingAtIndex:0];
             NSString *valueDescription = [[self class] _descriptionOfValue:propertyValue withLocale:locale indent:level];
             
-            [description appendFormat:@"\n%@%@: %@,", padding, propertyName, valueDescription];
+            [description appendFormat:@"\n%@%@: %@", padding, propertyName, valueDescription];
+            
+            if ([ignoredPropertyNames containsObject:propertyName])
+            {
+                [description appendString:@" (ignoring inheritance)"];
+            }
+            
+            [description appendString:@","];
         }
     }
     
