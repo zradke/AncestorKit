@@ -82,7 +82,44 @@
 @end
 
 
+static void *AKTestPersonDeepSubclassKVOContext = &AKTestPersonDeepSubclassKVOContext;
+
 @implementation AKTestPersonDeepSubclass
+
+- (instancetype)initWithAncestor:(AKAncestor *)ancestor inheritKeyValueNotifications:(BOOL)shouldInheritKeyValueNotifications
+{
+    if (!(self = [super initWithAncestor:ancestor inheritKeyValueNotifications:shouldInheritKeyValueNotifications]))
+    {
+        return nil;
+    }
+    
+    [self addObserver:self forKeyPath:NSStringFromSelector(@selector(firstName)) options:0 context:AKTestPersonDeepSubclassKVOContext];
+    [self addObserver:self forKeyPath:NSStringFromSelector(@selector(middleName)) options:0 context:AKTestPersonDeepSubclassKVOContext];
+    [self addObserver:self forKeyPath:NSStringFromSelector(@selector(lastName)) options:0 context:AKTestPersonDeepSubclassKVOContext];
+    
+    return self;
+}
+
+- (void)dealloc
+{
+    [self removeObserver:self forKeyPath:NSStringFromSelector(@selector(firstName)) context:AKTestPersonDeepSubclassKVOContext];
+    [self removeObserver:self forKeyPath:NSStringFromSelector(@selector(middleName)) context:AKTestPersonDeepSubclassKVOContext];
+    [self removeObserver:self forKeyPath:NSStringFromSelector(@selector(lastName)) context:AKTestPersonDeepSubclassKVOContext];
+}
+
+- (void)observeValueForKeyPath:(NSString *)keyPath ofObject:(id)object change:(NSDictionary *)change context:(void *)context
+{
+    if (context != AKTestPersonDeepSubclassKVOContext)
+    {
+        [super observeValueForKeyPath:keyPath ofObject:object change:change context:context];
+        return;
+    }
+    
+    if (self.fullNameDidChangeBlock)
+    {
+        self.fullNameDidChangeBlock();
+    }
+}
 
 - (NSString *)fullName
 {

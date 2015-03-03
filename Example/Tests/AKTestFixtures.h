@@ -25,6 +25,8 @@
 @interface AKTestPersonDeepSubclass : AKTestPersonSubclass
 @property (copy, nonatomic) NSString *middleName;
 @property (assign, nonatomic) BOOL isMarried;
+
+@property (copy, nonatomic) dispatch_block_t fullNameDidChangeBlock;
 @end
 
 @interface AKCollectionViewAttributes : AKAncestor

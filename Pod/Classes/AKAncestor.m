@@ -9,6 +9,7 @@
 #import "AKAncestor.h"
 #import "AKPropertyDescription.h"
 #import <objc/runtime.h>
+#import <libkern/OSAtomic.h>
 
 NSString *const AKAncestorNonObjectPropertyException = @"AKAncestorNonObjectPropertyException";
 NSString *const AKAncestorUnknownPropertyException = @"AKAncestorUnknownPropertyException";
@@ -16,8 +17,11 @@ NSString *const AKAncestorUnknownPropertyException = @"AKAncestorUnknownProperty
 static void *AKAncestorKVOContext = &AKAncestorKVOContext;
 
 @interface AKAncestor ()
+{
+    // Spin locks require using an Ivar or a static variable, so unfortunately we can't enjoy property goodness here.
+    OSSpinLock _ak_spinLock;
+}
 
-@property (strong, nonatomic, readonly) dispatch_queue_t ak_queue;
 @property (strong, nonatomic, readonly) NSMutableSet *ak_ignoredPropertyNames;
 
 @end
@@ -92,7 +96,7 @@ static void AKAncestorSwizzlePropertyGetter(Class class, AKPropertyDescription *
     NSCParameterAssert(class);
     NSCParameterAssert(property);
     
-    if (!property.propertyType == AKPropertyTypeObject)
+    if (property.propertyType != AKPropertyTypeObject)
     {
         [NSException raise:AKAncestorNonObjectPropertyException format:@"Property \"%@\" is not an object property and cannot be inherited by %@", property.propertyName, class];
         return;
@@ -123,10 +127,9 @@ static void AKAncestorSwizzlePropertyGetter(Class class, AKPropertyDescription *
         __unsafe_unretained id returnValue;
         [invocation getReturnValue:&returnValue];
         
-        __block BOOL isIgnoredProperty;
-        dispatch_sync([self ak_queue], ^{
-            isIgnoredProperty = [[self ak_ignoredPropertyNames] containsObject:propertyName];
-        });
+        OSSpinLockLock(&((AKAncestor *)self)->_ak_spinLock);
+        BOOL isIgnoredProperty = [[self ak_ignoredPropertyNames] containsObject:propertyName];
+        OSSpinLockUnlock(&((AKAncestor *)self)->_ak_spinLock);
         
         // If there isn't a return value, we'll check the ancestor for a value
         if (!returnValue && [self ancestor] && !isIgnoredProperty)
@@ -190,8 +193,7 @@ static void AKAncestorSwizzlePropertyGetter(Class class, AKPropertyDescription *
     }
     
     _ancestor = ancestor;
-    NSString *queueName = [NSString stringWithFormat:@"com.zachradke.ancestorKit.queue.%p", self];
-    _ak_queue = dispatch_queue_create([queueName UTF8String], DISPATCH_QUEUE_CONCURRENT);
+    _ak_spinLock = OS_SPINLOCK_INIT;
     _ak_ignoredPropertyNames = [NSMutableSet set];
     
     _inheritsKeyValueNotifications = shouldInheritKeyValueNotifications;
@@ -240,9 +242,9 @@ static void AKAncestorSwizzlePropertyGetter(Class class, AKPropertyDescription *
         [NSException raise:AKAncestorUnknownPropertyException format:@"No property with the name \"%@\" is being inherited by %@.", name, [self class]];
     }
     
-    dispatch_barrier_async(self.ak_queue, ^{
-        [self.ak_ignoredPropertyNames addObject:name];
-    });
+    OSSpinLockLock(&_ak_spinLock);
+    [self.ak_ignoredPropertyNames addObject:name];
+    OSSpinLockUnlock(&_ak_spinLock);
 }
 
 - (void)resumeInheritingValuesForPropertyName:(NSString *)propertyName
@@ -250,20 +252,18 @@ static void AKAncestorSwizzlePropertyGetter(Class class, AKPropertyDescription *
     // Create a copy to prevent any shady business when we dispatch async.
     NSString *name = [propertyName copy];
     
-    dispatch_barrier_async(self.ak_queue, ^{
-        [self.ak_ignoredPropertyNames removeObject:name];
-    });
+    OSSpinLockLock(&_ak_spinLock);
+    [self.ak_ignoredPropertyNames removeObject:name];
+    OSSpinLockUnlock(&_ak_spinLock);
 }
 
 - (NSSet *)propertiesIgnoringInheritedValues
 {
-    __block NSSet *properties;
-    dispatch_sync(self.ak_queue, ^{
-        NSPredicate *predicate = [NSPredicate predicateWithFormat:@"%K IN %@", NSStringFromSelector(@selector(propertyName)), self.ak_ignoredPropertyNames];
-        properties = [[[self class] propertiesPassedToDescendants] filteredSetUsingPredicate:predicate];
-    });
+    OSSpinLockLock(&_ak_spinLock);
+    NSPredicate *predicate = [NSPredicate predicateWithFormat:@"%K IN %@", NSStringFromSelector(@selector(propertyName)), self.ak_ignoredPropertyNames];
+    OSSpinLockUnlock(&_ak_spinLock);
     
-    return properties;
+    return [[[self class] propertiesPassedToDescendants] filteredSetUsingPredicate:predicate];
 }
 
 
@@ -271,8 +271,7 @@ static void AKAncestorSwizzlePropertyGetter(Class class, AKPropertyDescription *
 
 + (NSSet *)propertiesPassedToDescendants
 {
-    NSArray *acceptablePropertyTypes = @[@(AKPropertyTypeBlock), @(AKPropertyTypeObject)];
-    NSPredicate *predicate = [NSPredicate predicateWithFormat:@"%K IN %@", NSStringFromSelector(@selector(propertyType)), acceptablePropertyTypes];
+    NSPredicate *predicate = [NSPredicate predicateWithFormat:@"%K == %i", NSStringFromSelector(@selector(propertyType)), AKPropertyTypeObject];
     return [[self _allInheritedProperties] filteredSetUsingPredicate:predicate];
 }
 
@@ -321,10 +320,9 @@ static void AKAncestorSwizzlePropertyGetter(Class class, AKPropertyDescription *
         return;
     }
     
-    __block BOOL isIgnoredProperty;
-    dispatch_sync(self.ak_queue, ^{
-        isIgnoredProperty = [self.ak_ignoredPropertyNames containsObject:keyPath];
-    });
+    OSSpinLockLock(&_ak_spinLock);
+    BOOL isIgnoredProperty = [self.ak_ignoredPropertyNames containsObject:keyPath];
+    OSSpinLockUnlock(&_ak_spinLock);
     
     // If we're ignoring inheritance on this property, then it's value won't change with key value notifications
     if (isIgnoredProperty)

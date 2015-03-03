@@ -193,6 +193,23 @@
     XCTAssertTrue(UIEdgeInsetsEqualToEdgeInsets(attrsB.sectionInsets, UIEdgeInsetsMake(0.0, 20.0, 0.0, 20.0)));
 }
 
+- (void)testBlockPropertiesNotInherited
+{
+    AKTestPersonDeepSubclass *personA = [AKTestPersonDeepSubclass new];
+    personA.firstName = @"Harry";
+    personA.middleName = @"James";
+    personA.lastName = @"Potter";
+    
+    personA.fullNameDidChangeBlock = ^{
+        NSLog(@"Full name did change.");
+    };
+    
+    AKTestPersonDeepSubclass *personB = [personA descendant];
+    personB.firstName = @"Lily";
+    
+    XCTAssertNil(personB.fullNameDidChangeBlock);
+}
+
 
 #pragma mark - KVC
 
@@ -208,6 +225,26 @@
     [self keyValueObservingExpectationForObject:personB keyPath:NSStringFromSelector(@selector(lastName)) expectedValue:@"Evans"];
     
     personA.lastName = @"Evans";
+    
+    [self waitForExpectationsWithTimeout:5.0 handler:nil];
+}
+
+- (void)testInheritanceOverridenKVC
+{
+    AKTestPersonDeepSubclass *personA = [AKTestPersonDeepSubclass new];
+    personA.firstName = @"Lily";
+    personA.lastName = @"Evans";
+    
+    AKTestPersonDeepSubclass *personB = [AKTestPersonDeepSubclass new];
+    personB.firstName = @"Harry";
+    personB.lastName = @"P.";
+    personB.fullNameDidChangeBlock = ^{
+        XCTFail(@"The last name should not generate a key-value notification.");
+    };
+    
+    [self keyValueObservingExpectationForObject:personA keyPath:NSStringFromSelector(@selector(lastName)) expectedValue:@"Potter"];
+    
+    personA.lastName = @"Potter";
     
     [self waitForExpectationsWithTimeout:5.0 handler:nil];
 }
@@ -334,6 +371,27 @@
     XCTAssertEqualObjects(personB.firstName, @"HARRY");
     XCTAssertEqualObjects(personB.lastName, @"Potter");
     XCTAssertEqualObjects(personB.birthDate, [dateFormatter dateFromString:@"1980/07/31"]);
+}
+
+
+#pragma mark - Performance tests
+
+- (void)testInitWithWithKVC
+{
+    AKTestPerson *baseDescendant = [AKTestPerson new];
+    
+    [self measureBlock:^{
+        AKTestPerson *person = [[AKTestPerson alloc] initWithAncestor:baseDescendant inheritKeyValueNotifications:YES];
+    }];
+}
+
+- (void)testInitWithoutKVC
+{
+    AKTestPerson *baseDescendant = [AKTestPerson new];
+    
+    [self measureBlock:^{
+        AKTestPerson *person = [[AKTestPerson alloc] initWithAncestor:baseDescendant inheritKeyValueNotifications:NO];
+    }];
 }
 
 @end

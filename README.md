@@ -198,7 +198,7 @@ AncestorKit uses the Objective-C runtime to inspect subclasses of `AKAncestor`, 
 
 This means that special care should be taken in the `+propertiesPassedToDescendants` method to ensure that only valid properties are returned. Since this all occurs within the `[AKAncestor load]` method, this also means that runtime added properties and classes are not supported, as they will be added after `AKAncestor` has completed loading.
 
-Only object properties are eligable for inheritance. This is because object properties can be `nil`, which indicates that there is no value. AncestorKit relies on the concept of "no-value" to determine when it should search ancestors for a possible value. This makes it hard if not impossible to work with primitive types, since a `BOOL` property can be `NO` because it hasn't been set, or `NO` because it was intentionally set that way.
+Only object properties are eligable for inheritance. This is because object properties can be `nil`, which indicates that there is no value. AncestorKit relies on the concept of "no-value" to determine when it should search ancestors for a possible value. This makes it hard if not impossible to work with primitive types, since a `BOOL` property can be `NO` because it hasn't been set, or `NO` because it was intentionally set that way. Although blocks can be cast to `id`, they are also not considered eligible for inheritance.
 
 ## Contributing
 
